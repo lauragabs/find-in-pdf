@@ -1,0 +1,14 @@
+#!/bin/sh
+# Valida a mensagem de commit no padrão tipo: descrição.
+commit_msg_file="$1"
+commit_msg=$(sed -n '1p' "$commit_msg_file")
+regex='^(chore|feat|fix|docs|style|refactor|perf|test|build|ci|revert): .+'
+
+if ! printf '%s' "$commit_msg" | grep -Eq "$regex"; then
+  echo "\nERROR: Mensagem de commit inválida. Use o formato:"
+  echo "  type: descrição"
+  echo "Tipos válidos: chore, feat, fix, docs, style, refactor, perf, test, build, ci, revert"
+  echo "Exemplo: chore: adiciona arquivos iniciais do projeto, incluindo .gitignore, README.md e pom.xml"
+  echo "\nTambém é possível usar o arquivo de modelo .gitmessage para iniciar a mensagem."
+  exit 1
+fi

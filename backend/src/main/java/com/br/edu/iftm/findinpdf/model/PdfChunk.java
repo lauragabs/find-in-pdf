@@ -1,5 +1,9 @@
 package com.br.edu.iftm.findinpdf.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import dev.langchain4j.data.embedding.Embedding;
+
 /**
  * Classe que representa um pedaço (chunk) de texto extraído de um PDF.
  * Contém o conteúdo textual e os metadados necessários para a localização.
@@ -10,6 +14,9 @@ public class PdfChunk {
     private String nomeArquivo;
     private int numeroPagina;
     private String conteudoTexto;
+    
+    @JsonIgnore  // Não serializa o embedding para JSON (é usado apenas internamente para buscas)
+    private Embedding embedding;
 
     // Construtor padrão (vazio)
     public PdfChunk() {
@@ -53,6 +60,14 @@ public class PdfChunk {
 
     public void setConteudoTexto(String conteudoTexto) {
         this.conteudoTexto = conteudoTexto;
+    }
+
+    public Embedding getEmbedding() {
+        return embedding;
+    }
+
+    public void setEmbedding(Embedding embedding) {
+        this.embedding = embedding;
     }
 }
 

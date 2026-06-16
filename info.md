@@ -37,7 +37,3 @@ Frontend
 
 Interface web (React/Vue/HTML): campo de busca e exibição dos trechos retornados com arquivo e página.
 Infra e utilitários
-
-Job Scheduler: tarefa para indexar novos PDFs ou reindexar (cron ou queue).
-Logging/Monitoring: métricas e logs (Prometheus/Grafana, Sentry).
-Autenticação/autorização: (se necessário) proteger endpoints e arquivos.

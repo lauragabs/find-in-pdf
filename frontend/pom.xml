@@ -4,12 +4,13 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.examplebr.edu.iftm.findinpdf</groupId>
+        <groupId>com.br.edu.iftm.findinpdf</groupId>
         <artifactId>findinpdf-parent</artifactId>
         <version>1.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
+    <groupId>com.br.edu.iftm.findinpdf</groupId>
     <artifactId>frontend</artifactId>
     <packaging>pom</packaging>
 </project>

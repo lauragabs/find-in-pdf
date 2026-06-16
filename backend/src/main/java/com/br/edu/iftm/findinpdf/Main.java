@@ -1,4 +1,4 @@
-package com.examplebr.edu.iftm.findinpdf;
+package com.br.edu.iftm.findinpdf;
 
 public class Main {
     public static void main(String[] args) {

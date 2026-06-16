@@ -211,7 +211,9 @@ public class PdfService {
                 .distinct()
                 .collect(Collectors.toList());
 
-        Embedding vetorPergunta = modeloIa.embed(perguntaUsuario).content(); // Converte a pergunta do usuário em um vetor numérico usando o modelo de IA
+        // Remove stop words da pergunta para calcular o embedding semântico, garantindo que as palavras não-significativas não afetem o resultado
+        String perguntaLimpa = String.join(" ", palavrasChave);
+        Embedding vetorPergunta = modeloIa.embed(perguntaLimpa.isEmpty() ? perguntaUsuario : perguntaLimpa).content(); // Converte a pergunta do usuário em um vetor numérico usando o modelo de IA
         Map<PdfChunk, Double> chunkSimilaridade = new HashMap<>();
 
         double melhorPontuacao = -1;

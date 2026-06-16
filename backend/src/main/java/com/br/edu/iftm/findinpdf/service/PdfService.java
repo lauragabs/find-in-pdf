@@ -6,8 +6,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -108,6 +111,7 @@ public class PdfService {
         return pasta;
     }
 
+    // Cria chunks de texto com base no modo configurado (parágrafo ou número máximo de palavras)
     private List<String> criarChunks(String texto) {
         if ("paragraph".equalsIgnoreCase(chunkMode)) {
             return dividirTextoEmParagrafos(texto);
@@ -115,6 +119,7 @@ public class PdfService {
         return dividirTextoEmChunks(texto, maxWordsPerChunk);
     }
 
+    // Divide o texto em parágrafos usando quebras de linha duplas como delimitadores
     private List<String> dividirTextoEmParagrafos(String texto) {
         List<String> paragrafos = new ArrayList<>();
         String[] partes = texto.split("\\r?\\n\\s*\\r?\\n");
@@ -133,6 +138,7 @@ public class PdfService {
         return paragrafos;
     }
 
+    // Divide o texto em chunks com base no número máximo de palavras
     private List<String> dividirTextoEmChunks(String texto, int maxWords) {
         List<String> chunks = new ArrayList<>();
         String[] palavras = texto.split("\\s+");
@@ -183,23 +189,34 @@ public class PdfService {
         return pdfFiles;
     }
 
+    // palavras comuns que não agregam significado e podem ser ignoradas na busca para melhorar a relevância dos resultados
+    private static final Set<String> STOP_WORDS = new HashSet<>(Arrays.asList(
+            "com", "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas",
+            "para", "por", "e", "ou", "um", "uma", "uns", "umas", "que", "o", "a"
+    ));
+
     //buscar o significado da pergunta do usuário comparando com os chunks indexados usando IA
     public List<PdfChunk> buscar(String perguntaUsuario) {
         List<PdfChunk> resultados = new ArrayList<>();
 
-        // Validação básica para evitar processamento desnecessário
         if (perguntaUsuario == null || perguntaUsuario.trim().isEmpty() || bancoDeDadosLocal.isEmpty()) {
             return resultados;
         }
 
         System.out.println("Buscando por significado para: '" + perguntaUsuario + "'");
 
+        // Extrai palavras-chave da pergunta do usuário, ignorando stop words e palavras muito curtas
+        List<String> palavrasChave = Arrays.stream(perguntaUsuario.toLowerCase().split("[^\\p{L}\\p{Nd}]+"))
+                .filter(p -> p.length() > 1 && !STOP_WORDS.contains(p))
+                .distinct()
+                .collect(Collectors.toList());
+
         Embedding vetorPergunta = modeloIa.embed(perguntaUsuario).content(); // Converte a pergunta do usuário em um vetor numérico usando o modelo de IA
         Map<PdfChunk, Double> chunkSimilaridade = new HashMap<>();
 
         double melhorPontuacao = -1;
         PdfChunk melhorChunk = null;
-        double threshold = 0.25; //sensibilidade para considerar um resultado relevante(quanto menor, mais resultados serão retornados, mesmo os menos relevantes)
+        double threshold = 0.45; //sensibilidade para considerar um resultado relevante(quanto menor, mais resultados serão retornados, mesmo os menos relevantes)
 
         // Calcula a similaridade semântica entre a pergunta do usuário e cada chunk indexado usando o modelo de IA
         for (PdfChunk chunk : bancoDeDadosLocal) {
@@ -216,13 +233,48 @@ public class PdfService {
             }
         }
 
-        if (resultados.isEmpty() && melhorChunk != null) {
-            System.out.println("Nenhuma correspondência forte encontrada; retornando melhor resultado com score=" + melhorPontuacao);
+        if (!resultados.isEmpty()) {
+            resultados.sort(Comparator.comparingDouble(chunkSimilaridade::get).reversed());
+            return resultados;
+        }
+
+        // Se nenhum resultado semântico forte for encontrado, tenta encontrar chunks que contenham as palavras-chave extraídas da pergunta do usuário
+        if (!palavrasChave.isEmpty()) {
+            List<PdfChunk> fallback = bancoDeDadosLocal.stream()
+                    .filter(chunk -> chunkContemPalavraChave(chunk, palavrasChave))
+                    .sorted((c1, c2) -> Double.compare(
+                            chunkSimilaridade.getOrDefault(c2, -1.0),
+                            chunkSimilaridade.getOrDefault(c1, -1.0)))
+                    .limit(5)
+                    .collect(Collectors.toList());
+
+            if (!fallback.isEmpty()) {
+                return fallback;
+            }
+        }
+
+        //todo : se nenhum resultado semântico forte ou baseado em palavras-chave for encontrado, procura semanticas baseadas em cada palavra-chave individualmente e retorna os chunks mais relevantes para cada palavra-chave, mesmo que a pontuação de similaridade seja baixa, para fornecer algum contexto ao usuário. Isso pode ajudar a encontrar informações relevantes mesmo quando a pergunta do usuário é muito diferente dos textos indexados ou quando o modelo de IA não consegue captar a semântica corretamente.
+
+
+        // Se nenhum resultado semântico forte ou baseado em palavras-chave for encontrado, retorna o chunk com a melhor pontuação de similaridade, mesmo que seja baixa, para fornecer algum contexto ao usuário
+        if (melhorChunk != null) {
+            System.out.println("Nenhuma correspondência forte ou baseada em palavras-chave encontrada; retornando o melhor resultado disponível com score=" + melhorPontuacao);
             resultados.add(melhorChunk);
         }
 
-        resultados.sort(Comparator.comparingDouble(chunkSimilaridade::get).reversed());
-
         return resultados;
+    }
+
+    // Verifica se o chunk contém alguma das palavras-chave extraídas da pergunta do usuário, considerando apenas o conteúdo do texto
+    private boolean chunkContemPalavraChave(PdfChunk chunk, List<String> palavrasChave) {
+        String textoChunk = chunk.getConteudoTexto().toLowerCase().replaceAll("[^\\p{L}\\p{Nd}]+", " ");
+
+        for (String palavra : palavrasChave) {
+            if (textoChunk.contains(palavra)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -65,8 +65,7 @@ findinpdf/
 ## Endpoints da API
 
 - `GET /api/pdfs/listar` - Lista todos os PDFs disponíveis
-- `GET /api/pdfs/indexar?arquivo=nome.pdf` - Indexa um PDF específico
-- `POST /api/pdfs/indexar-selecionados` - Indexa múltiplos PDFs (JSON array)
+- `POST /api/pdfs/indexar` - Indexa os PDFs selecionados (JSON array) e limpas os resultados anteriores
 - `GET /api/pdfs/buscar?pergunta=sua_pergunta` - Realiza busca semântica
 
 ## Como executar
@@ -99,4 +98,20 @@ findinpdf/
 - **Limiar**: Retorna resultados com score > 0.25, ou o melhor match se nenhum ultrapassar o limiar
 - **Índice**: Armazenado em memória (lista); limpo quando novos PDFs são indexados
 - **CORS**: Habilitado globalmente para permitir requisições do frontend
+
+## Configuração de chunking
+
+O comportamento de chunking pode ser ajustado em `backend/src/main/resources/application.properties`:
+
+- `findinpdf.chunk.mode=paragraph` — cada chunk é um parágrafo do texto extraído
+- `findinpdf.chunk.mode=words` — cada chunk tem no máximo `findinpdf.chunk.max-words` palavras
+
+Exemplo de configuração:
+
+```properties
+findinpdf.chunk.mode=paragraph
+findinpdf.chunk.max-words=500
+```
+
+No modo `paragraph`, cada parágrafo é tratado como um chunk. No modo `words`, o texto é dividido em chunks com até 500 palavras por padrão.
 

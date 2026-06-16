@@ -63,7 +63,7 @@ indexSelectedButton.addEventListener('click', async () => {
     output.textContent = `Indexando ${selecionados.length} PDF(s)...`;
 
     try {
-        const response = await fetch('/api/pdfs/indexar-selecionados', {
+        const response = await fetch('/api/pdfs/indexar', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

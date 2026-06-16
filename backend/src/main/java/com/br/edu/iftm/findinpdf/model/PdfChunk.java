@@ -7,6 +7,8 @@ import dev.langchain4j.data.embedding.Embedding;
 /**
  * Classe que representa um pedaço (chunk) de texto extraído de um PDF.
  * Contém o conteúdo textual e os metadados necessários para a localização.
+ * Tamanho do chunk: definido por 'maxWordsPerChunk' no serviço, recomendado entre 300-500 palavras para melhor desempenho.
+ * O campo 'embedding' é ignorado na serialização JSON para evitar exposição desnecessária
  */
 public class PdfChunk {
 
@@ -15,10 +17,9 @@ public class PdfChunk {
     private int numeroPagina;
     private String conteudoTexto;
     
-    @JsonIgnore  // Não serializa o embedding para JSON (é usado apenas internamente para buscas)
+    @JsonIgnore  
     private Embedding embedding;
 
-    // Construtor padrão (vazio)
     public PdfChunk() {
     }
 
@@ -29,7 +30,7 @@ public class PdfChunk {
         this.conteudoTexto = conteudoTexto;
     }
 
-    // Getters e Setters (Essenciais para o Spring e a serialização JSON)
+    // Getters e Setters
     public Long getId() {
         return id;
     }

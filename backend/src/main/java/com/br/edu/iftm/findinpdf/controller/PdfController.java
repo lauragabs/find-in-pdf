@@ -35,23 +35,10 @@ public class PdfController {
     }
 
     /**
-     * Endpoint para ler e indexar um arquivo PDF que está na pasta 'pdfs'.
+     * Endpoint para indexar os PDFs selecionados pelo usuário.
+     * O índice anterior é limpo antes de processar a nova seleção.
      */
-    @GetMapping("/indexar")
-    public ResponseEntity<String> indexar(@RequestParam String arquivo) {
-        boolean sucesso = pdfService.indexarPdf(arquivo);
-
-        if (!sucesso) {
-            return ResponseEntity.badRequest().body("Erro: arquivo '" + arquivo + "' não encontrado ou não pôde ser processado.");
-        }
-
-        return ResponseEntity.ok("Arquivo '" + arquivo + "' indexado com sucesso na memória usando IA!");
-    }
-
-    /**
-     * Endpoint para indexar múltiplos arquivos PDF selecionados pelo usuário.
-     */
-    @PostMapping("/indexar-selecionados")
+    @PostMapping("/indexar")
     public ResponseEntity<String> indexarSelecionados(@RequestBody List<String> arquivos) {
         if (arquivos == null || arquivos.isEmpty()) {
             return ResponseEntity.badRequest().body("Nenhum arquivo selecionado.");

@@ -11,6 +11,7 @@ import java.util.Map;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.br.edu.iftm.findinpdf.model.PdfChunk;
@@ -24,16 +25,20 @@ import dev.langchain4j.store.embedding.CosineSimilarity;
 public class PdfService {
 
     private final List<PdfChunk> bancoDeDadosLocal = new ArrayList<>();
+    private final int maxWordsPerChunk;
+    private final String chunkMode;
     
     // Inicializa o modelo de IA local 
     private final EmbeddingModel modeloIa = new AllMiniLmL6V2EmbeddingModel();
 
-    public boolean indexarPdf(String nomeArquivo) {
-        // Limpa o índice anterior para manter somente o último arquivo indexado
-        bancoDeDadosLocal.clear();
-        return indexarPdfSemLimpeza(nomeArquivo);
+    public PdfService(
+            @Value("${findinpdf.chunk.max-words:500}") int maxWordsPerChunk,
+            @Value("${findinpdf.chunk.mode:words}") String chunkMode) {
+        this.maxWordsPerChunk = maxWordsPerChunk;
+        this.chunkMode = chunkMode;
     }
 
+    // Indexa múltiplos PDFs, mantendo todos os chunks indexados na memória
     public boolean indexarPdfs(List<String> nomesArquivos) {
         bancoDeDadosLocal.clear();
         boolean sucesso = false;
@@ -70,13 +75,16 @@ public class PdfService {
                 String textoDaPagina = extrator.getText(documento).trim();
 
                 if (!textoDaPagina.isEmpty()) {
-                    PdfChunk novoChunk = new PdfChunk(nomeArquivo, paginaAtual, textoDaPagina);
-                    
-                    //Transforma o texto da página em um vetor numérico
-                    Embedding vetorSignificado = modeloIa.embed(textoDaPagina).content();
-                    novoChunk.setEmbedding(vetorSignificado);
+                    List<String> partes = criarChunks(textoDaPagina);
+                    for (String textoChunk : partes) {
+                        PdfChunk novoChunk = new PdfChunk(nomeArquivo, paginaAtual, textoChunk);
+                        
+                        // Transforma o texto do chunk em um vetor numérico
+                        Embedding vetorSignificado = modeloIa.embed(textoChunk).content();
+                        novoChunk.setEmbedding(vetorSignificado);
 
-                    bancoDeDadosLocal.add(novoChunk);
+                        bancoDeDadosLocal.add(novoChunk);
+                    }
                 }
             }
             System.out.println(" Arquivo " + nomeArquivo + " indexado com IA! Total de chunks: " + bancoDeDadosLocal.size());
@@ -100,6 +108,62 @@ public class PdfService {
         return pasta;
     }
 
+    private List<String> criarChunks(String texto) {
+        if ("paragraph".equalsIgnoreCase(chunkMode)) {
+            return dividirTextoEmParagrafos(texto);
+        }
+        return dividirTextoEmChunks(texto, maxWordsPerChunk);
+    }
+
+    private List<String> dividirTextoEmParagrafos(String texto) {
+        List<String> paragrafos = new ArrayList<>();
+        String[] partes = texto.split("\\r?\\n\\s*\\r?\\n");
+
+        for (String parte : partes) {
+            String parag = parte.trim().replaceAll("\\r?\\n", " ");
+            if (!parag.isEmpty()) {
+                paragrafos.add(parag);
+            }
+        }
+
+        if (paragrafos.isEmpty() && !texto.trim().isEmpty()) {
+            paragrafos.add(texto.trim().replaceAll("\\r?\\n", " "));
+        }
+
+        return paragrafos;
+    }
+
+    private List<String> dividirTextoEmChunks(String texto, int maxWords) {
+        List<String> chunks = new ArrayList<>();
+        String[] palavras = texto.split("\\s+");
+
+        if (palavras.length == 0) {
+            return chunks;
+        }
+
+        StringBuilder builder = new StringBuilder();
+        int contador = 0;
+
+        for (String palavra : palavras) {
+            if (contador > 0) {
+                builder.append(' ');
+            }
+            builder.append(palavra);
+            contador++;
+
+            if (contador >= maxWords) {
+                chunks.add(builder.toString().trim());
+                builder.setLength(0);
+                contador = 0;
+            }
+        }
+
+        if (builder.length() > 0) {
+            chunks.add(builder.toString().trim());
+        }
+
+        return chunks;
+    }
 
     // Lista os arquivos PDF disponíveis na pasta 'pdfs'
     public List<String> listarPdfs() {
@@ -123,19 +187,21 @@ public class PdfService {
     public List<PdfChunk> buscar(String perguntaUsuario) {
         List<PdfChunk> resultados = new ArrayList<>();
 
+        // Validação básica para evitar processamento desnecessário
         if (perguntaUsuario == null || perguntaUsuario.trim().isEmpty() || bancoDeDadosLocal.isEmpty()) {
             return resultados;
         }
 
         System.out.println("Buscando por significado para: '" + perguntaUsuario + "'");
 
-        Embedding vetorPergunta = modeloIa.embed(perguntaUsuario).content();
+        Embedding vetorPergunta = modeloIa.embed(perguntaUsuario).content(); // Converte a pergunta do usuário em um vetor numérico usando o modelo de IA
         Map<PdfChunk, Double> chunkSimilaridade = new HashMap<>();
 
         double melhorPontuacao = -1;
         PdfChunk melhorChunk = null;
         double threshold = 0.25; //sensibilidade para considerar um resultado relevante(quanto menor, mais resultados serão retornados, mesmo os menos relevantes)
 
+        // Calcula a similaridade semântica entre a pergunta do usuário e cada chunk indexado usando o modelo de IA
         for (PdfChunk chunk : bancoDeDadosLocal) {
             double pontuacaoSemantica = CosineSimilarity.between(chunk.getEmbedding(), vetorPergunta);
             chunkSimilaridade.put(chunk, pontuacaoSemantica);

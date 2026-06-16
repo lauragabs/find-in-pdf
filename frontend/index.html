@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Find in PDF</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Find in PDF</h1>
+            <p>frontend simples para testes</p>
+        </header>
+
+        <section class="card">
+            <h2>PDFs disponíveis</h2>
+            <div id="pdf-list" class="pdf-list">Carregando lista de PDFs...</div>
+            <div class="actions">
+                <button id="select-all" type="button">Selecionar todos</button>
+                <button id="clear-selection" type="button">Limpar seleção</button>
+                <button id="index-selected" type="button">Indexar selecionados</button>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Buscar no PDF indexado</h2>
+            <form id="search-form">
+                <label for="search-query">Pergunta:</label>
+                <input id="search-query" type="text" placeholder="Digite sua pergunta aqui..." required />
+                <button type="submit">Buscar</button>
+            </form>
+        </section>
+
+        <section class="card">
+            <h2>Resultado</h2>
+            <pre id="output">Use os formulários acima para indexar um PDF e fazer uma pergunta.</pre>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

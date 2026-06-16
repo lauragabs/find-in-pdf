@@ -3,6 +3,7 @@ package com.br.edu.iftm.findinpdf.service;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -30,9 +31,29 @@ public class PdfService {
     public boolean indexarPdf(String nomeArquivo) {
         // Limpa o índice anterior para manter somente o último arquivo indexado
         bancoDeDadosLocal.clear();
+        return indexarPdfSemLimpeza(nomeArquivo);
+    }
 
-        // Caminho relativo ao diretório raiz do projeto
-        File arquivoPdf = new File("../pdfs/" + nomeArquivo);
+    public boolean indexarPdfs(List<String> nomesArquivos) {
+        bancoDeDadosLocal.clear();
+        boolean sucesso = false;
+
+        for (String nomeArquivo : nomesArquivos) {
+            if (nomeArquivo == null || nomeArquivo.trim().isEmpty()) {
+                continue;
+            }
+            if (indexarPdfSemLimpeza(nomeArquivo.trim())) {
+                sucesso = true;
+            }
+        }
+
+        return sucesso;
+    }
+
+    // Método auxiliar para indexar um PDF sem limpar o índice anterior (usado para indexar múltiplos arquivos)
+    private boolean indexarPdfSemLimpeza(String nomeArquivo) {
+        File pastaPdfs = encontrarPastaPdfs();
+        File arquivoPdf = new File(pastaPdfs, nomeArquivo);
 
         if (!arquivoPdf.exists()) {
             System.err.println("Erro: Arquivo não encontrado em: " + arquivoPdf.getAbsolutePath());
@@ -51,14 +72,14 @@ public class PdfService {
                 if (!textoDaPagina.isEmpty()) {
                     PdfChunk novoChunk = new PdfChunk(nomeArquivo, paginaAtual, textoDaPagina);
                     
-                    // PASSAGEM DA IA: Transforma o texto da página em um vetor numérico
+                    //Transforma o texto da página em um vetor numérico
                     Embedding vetorSignificado = modeloIa.embed(textoDaPagina).content();
                     novoChunk.setEmbedding(vetorSignificado);
 
                     bancoDeDadosLocal.add(novoChunk);
                 }
             }
-            System.out.println("Indexado com IA! Total de chunks: " + bancoDeDadosLocal.size());
+            System.out.println(" Arquivo " + nomeArquivo + " indexado com IA! Total de chunks: " + bancoDeDadosLocal.size());
             return true;
         } catch (IOException e) {
             System.err.println("Erro: " + e.getMessage());
@@ -66,9 +87,39 @@ public class PdfService {
         }
     }
 
-    /**
-     * Realiza a Busca Semântica por linguagem natural usando Similaridade de Cosseno.
-     */
+    // Tenta encontrar a pasta 'pdfs' tanto no diretório atual quanto no diretório pai
+    private File encontrarPastaPdfs() {
+        File pasta = new File("pdfs");
+        if (pasta.exists() && pasta.isDirectory()) {
+            return pasta;
+        }
+        pasta = new File("../pdfs");
+        if (pasta.exists() && pasta.isDirectory()) {
+            return pasta;
+        }
+        return pasta;
+    }
+
+
+    // Lista os arquivos PDF disponíveis na pasta 'pdfs'
+    public List<String> listarPdfs() {
+        File pastaPdfs = encontrarPastaPdfs();
+        List<String> pdfFiles = new ArrayList<>();
+
+        if (pastaPdfs != null && pastaPdfs.exists() && pastaPdfs.isDirectory()) {
+            File[] arquivos = pastaPdfs.listFiles((dir, name) -> name.toLowerCase().endsWith(".pdf"));
+            if (arquivos != null) {
+                Arrays.sort(arquivos);
+                for (File arquivo : arquivos) {
+                    pdfFiles.add(arquivo.getName());
+                }
+            }
+        }
+
+        return pdfFiles;
+    }
+
+    //buscar o significado da pergunta do usuário comparando com os chunks indexados usando IA
     public List<PdfChunk> buscar(String perguntaUsuario) {
         List<PdfChunk> resultados = new ArrayList<>();
 
@@ -83,7 +134,7 @@ public class PdfService {
 
         double melhorPontuacao = -1;
         PdfChunk melhorChunk = null;
-        double threshold = 0.25;
+        double threshold = 0.25; //sensibilidade para considerar um resultado relevante(quanto menor, mais resultados serão retornados, mesmo os menos relevantes)
 
         for (PdfChunk chunk : bancoDeDadosLocal) {
             double pontuacaoSemantica = CosineSimilarity.between(chunk.getEmbedding(), vetorPergunta);

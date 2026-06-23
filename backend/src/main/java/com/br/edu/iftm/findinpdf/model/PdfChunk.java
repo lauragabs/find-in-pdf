@@ -16,6 +16,7 @@ public class PdfChunk {
     private String nomeArquivo;
     private int numeroPagina;
     private String conteudoTexto;
+    private String conteudoPagina;
     
     @JsonIgnore  
     private Embedding embedding;
@@ -61,6 +62,14 @@ public class PdfChunk {
 
     public void setConteudoTexto(String conteudoTexto) {
         this.conteudoTexto = conteudoTexto;
+    }
+
+    public String getConteudoPagina() {
+        return conteudoPagina;
+    }
+
+    public void setConteudoPagina(String conteudoPagina) {
+        this.conteudoPagina = conteudoPagina;
     }
 
     public Embedding getEmbedding() {

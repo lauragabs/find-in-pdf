@@ -70,6 +70,10 @@ public class PdfService {
 
         try (PDDocument documento = PDDocument.load(arquivoPdf)) {
             PDFTextStripper extrator = new PDFTextStripper();
+            extrator.setSortByPosition(true);
+            extrator.setLineSeparator("\n");
+            extrator.setParagraphStart("");
+            extrator.setParagraphEnd("\n\n");
             int totalPaginas = documento.getNumberOfPages();
 
             for (int paginaAtual = 1; paginaAtual <= totalPaginas; paginaAtual++) {
@@ -78,9 +82,11 @@ public class PdfService {
                 String textoDaPagina = extrator.getText(documento).trim();
 
                 if (!textoDaPagina.isEmpty()) {
-                    List<String> partes = criarChunks(textoDaPagina);
+                    String textoLimpo = limparTextoExtraido(textoDaPagina);
+                    List<String> partes = criarChunks(textoLimpo);
                     for (String textoChunk : partes) {
                         PdfChunk novoChunk = new PdfChunk(nomeArquivo, paginaAtual, textoChunk);
+                        novoChunk.setConteudoPagina(textoLimpo);
                         
                         // Transforma o texto do chunk em um vetor numérico
                         Embedding vetorSignificado = modeloIa.embed(textoChunk).content();
@@ -125,14 +131,14 @@ public class PdfService {
         String[] partes = texto.split("\\r?\\n\\s*\\r?\\n");
 
         for (String parte : partes) {
-            String parag = parte.trim().replaceAll("\\r?\\n", " ");
+            String parag = parte.trim().replaceAll("\\r?\\n", "\\n");
             if (!parag.isEmpty()) {
                 paragrafos.add(parag);
             }
         }
 
         if (paragrafos.isEmpty() && !texto.trim().isEmpty()) {
-            paragrafos.add(texto.trim().replaceAll("\\r?\\n", " "));
+            paragrafos.add(texto.trim().replaceAll("\\r?\\n", "\\n"));
         }
 
         return paragrafos;
@@ -278,5 +284,28 @@ public class PdfService {
         }
 
         return false;
+    }
+
+    private String limparTextoExtraido(String texto) {
+        if (texto == null || texto.isBlank()) {
+            return texto;
+        }
+
+        String resultado = texto;
+
+        // Padroniza quebras de linha
+        resultado = resultado.replace("\r\n", "\n")
+                            .replace("\r", "\n");
+
+        // Remove palavras quebradas por hífen no fim da linha
+        resultado = resultado.replaceAll("-\\s*\\n\\s*", "");
+
+        // Caso o extrator esteja retornando "nn" no lugar de quebra de linha
+        resultado = resultado.replace("nn", "\n\n");
+
+        // Remove excesso de linhas em branco
+        resultado = resultado.replaceAll("\\n{3,}", "\n\n");
+
+        return resultado.trim();
     }
 }

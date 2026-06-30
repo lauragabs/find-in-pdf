@@ -94,18 +94,18 @@ searchForm.addEventListener('submit', async (event) => {
         if (contentType.includes('application/json')) {
             const data = await response.json();
             if (Array.isArray(data)) {
-                const palavrasChave = extrairPalavrasChave(pergunta);
                 output.classList.add('results-mode');
                 output.innerHTML = data.map((chunk) => {
+                    const palavrasRelevantes = obterPalavrasRelevantes(chunk, pergunta);
                     const textoChunk = String(chunk.conteudoTexto || chunk.text || '');
                     const textoPagina = String(chunk.conteudoPagina || textoChunk);
                     const arquivo = String(chunk.nomeArquivo || chunk.fileName || '');
                     const pagina = chunk.numeroPagina || chunk.page || '';
-                    const baseTrecho = textoChunk.trim() ? textoChunk : textoPagina;
-                    const trechoPreview = gerarTrechoPreview(baseTrecho, palavrasChave, 420);
+                    const baseTrecho = escolherBaseTrecho(textoChunk, textoPagina, palavrasRelevantes);
+                    const trechoPreview = gerarTrechoPreview(baseTrecho, palavrasRelevantes, 420);
                     const temPaginaCompleta = textoPagina.trim().length > trechoPreview.trim().length + 20;
-                    const textoChunkDestacado = destacarPalavras(trechoPreview, palavrasChave);
-                    const textoPaginaDestacado = destacarPalavras(textoPagina, palavrasChave);
+                    const textoChunkDestacado = destacarPalavras(trechoPreview, palavrasRelevantes);
+                    const textoPaginaDestacado = destacarPalavras(textoPagina, palavrasRelevantes);
                     const painelId = `full-page-${arquivo}-${String(pagina)}`
                         .replace(/\s+/g, '-')
                         .replace(/[^a-zA-Z0-9_-]/g, '');
@@ -158,13 +158,28 @@ function extrairPalavrasChave(pergunta) {
         .filter((p, i, arr) => arr.indexOf(p) === i);
 }
 
+function obterPalavrasRelevantes(chunk, pergunta) {
+    const palavrasDoBackend = Array.isArray(chunk.palavrasRelevantes)
+        ? chunk.palavrasRelevantes.map((palavra) => String(palavra || '').trim()).filter(Boolean)
+        : [];
+
+    if (palavrasDoBackend.length > 0) {
+        return palavrasDoBackend;
+    }
+
+    return extrairPalavrasChave(pergunta);
+}
+
 function destacarPalavras(texto, palavras) {
     let resultado = escapeHtml(texto);
-    palavras.forEach((palavra) => {
+    palavras
+        .slice()
+        .sort((a, b) => String(b).length - String(a).length)
+        .forEach((palavra) => {
         const segura = escapeRegex(palavra);
         const regex = new RegExp(`(^|[^\\p{L}\\p{Nd}])(${segura})(?=[^\\p{L}\\p{Nd}]|$)`, 'giu');
         resultado = resultado.replace(regex, '$1<mark class="highlight">$2</mark>');
-    });
+        });
     return resultado;
 }
 
@@ -208,6 +223,36 @@ function gerarTrechoPreview(texto, palavras, tamanhoMaximo) {
     const prefixo = inicio > 0 ? '... ' : '';
     const sufixo = fim < textoLimpo.length ? ' ...' : '';
     return `${prefixo}${trecho}${sufixo}`;
+}
+
+function escolherBaseTrecho(textoChunk, textoPagina, palavras) {
+    const chunkLimpo = String(textoChunk || '').trim();
+    const paginaLimpa = String(textoPagina || '').trim();
+
+    if (!paginaLimpa) {
+        return chunkLimpo;
+    }
+
+    if (!chunkLimpo) {
+        return paginaLimpa;
+    }
+
+    const chunkTemPalavra = contemAlgumaPalavra(chunkLimpo, palavras);
+    const paginaTemPalavra = contemAlgumaPalavra(paginaLimpa, palavras);
+
+    if (!chunkTemPalavra && paginaTemPalavra) {
+        return paginaLimpa;
+    }
+
+    return chunkLimpo;
+}
+
+function contemAlgumaPalavra(texto, palavras) {
+    return palavras.some((palavra) => {
+        const segura = escapeRegex(palavra);
+        const regex = new RegExp(`(^|[^\\p{L}\\p{Nd}])${segura}(?=[^\\p{L}\\p{Nd}]|$)`, 'iu');
+        return regex.test(String(texto || ''));
+    });
 }
 
 function escapeHtml(text) {

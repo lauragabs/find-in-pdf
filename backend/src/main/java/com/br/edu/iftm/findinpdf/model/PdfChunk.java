@@ -1,5 +1,8 @@
 package com.br.edu.iftm.findinpdf.model;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import dev.langchain4j.data.embedding.Embedding;
@@ -17,6 +20,7 @@ public class PdfChunk {
     private int numeroPagina;
     private String conteudoTexto;
     private String conteudoPagina;
+    private List<String> palavrasRelevantes = new ArrayList<>();
     
     @JsonIgnore  
     private Embedding embedding;
@@ -70,6 +74,14 @@ public class PdfChunk {
 
     public void setConteudoPagina(String conteudoPagina) {
         this.conteudoPagina = conteudoPagina;
+    }
+
+    public List<String> getPalavrasRelevantes() {
+        return palavrasRelevantes;
+    }
+
+    public void setPalavrasRelevantes(List<String> palavrasRelevantes) {
+        this.palavrasRelevantes = palavrasRelevantes;
     }
 
     public Embedding getEmbedding() {

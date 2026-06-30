@@ -1,117 +1,148 @@
 # FindInPDF
 
-FindInPDF é uma aplicação web desenvolvida para realizar buscas inteligentes em documentos PDF utilizando consultas em linguagem natural.
+FindInPDF é uma aplicação web para indexar documentos PDF e buscar conteúdo por linguagem natural.
 
-O sistema permite que o usuário faça perguntas sobre o conteúdo dos documentos, retornando os trechos relevantes encontrados, juntamente com o nome do arquivo e a página onde a informação está localizada.
-
-A estrutura do projeto foi organizada para separar o backend e o frontend, e foi criada uma pasta `pdfs` para armazenar os documentos usados pelo sistema. Entre os PDFs disponibilizados, o material "Java Básico Orientação a Objeto" foi obtido de https://canal.cecierj.edu.br/012016/d7d8367338445d5a49b4d5a49f6ad2b9.pdf, e Spring Boot foi obtida de https://docs.spring.io/spring-boot/docs/3.2.7/reference/pdf/spring-boot-reference.pdf, e os demais arquivos foram gerados por IA.
-
-## Design e Prototipagem
-
-Figma: https://www.figma.com/design/F4v5CwrHF31Pad7A056eQK/Untitled?node-id=0-1&t=PLNjFzH43Q4SL9rH-1
+O sistema retorna os trechos mais relevantes, com arquivo e página de origem, e destaca no frontend os termos considerados relevantes pelo backend.
 
 ## Objetivo
 
-Facilitar a localização de informações em documentos PDF, reduzindo o tempo gasto na leitura e pesquisa manual de arquivos extensos.
+Facilitar a localização de informação em PDFs extensos, reduzindo leitura manual e tempo de pesquisa.
 
 ## Funcionalidades
 
-- Indexação do conteúdo dos documentos;
-- Busca utilizando linguagem natural;
-- Exibição dos resultados encontrados;
-- Identificação do arquivo de origem;
-- Exibição da página onde o trecho foi localizado.
+- Indexação de um ou mais PDFs da pasta `pdfs/`
+- Busca híbrida (lexical e semântica)
+- Expansão por sinônimos para consultas curtas
+- Destaque de termos relevantes no resultado
+- Exibição de trecho, arquivo e página
+
+## Arquitetura de Busca
+
+Atualmente a busca opera em três modos:
+
+- Consulta com menos de 2 palavras: busca lexical com expansão de sinônimos (OpenThesaurus)
+- Consulta com 2 palavras: modo híbrido (lexical + semântico)
+- Consulta com mais de 2 palavras: prioridade para busca semântica (pergunta vs chunk)
+
+### Componente lexical
+
+- Lucene (`PortugueseAnalyzer`) para normalização e busca textual
+- Índice em memória, reconstruído a cada indexação
+- Query por termo exato e por prefixo
+
+### Componente semântico
+
+- Embeddings locais com `AllMiniLmL6V2EmbeddingModel`
+- Similaridade de cosseno entre pergunta e chunks
+- Fallback por melhor score quando aplicável
 
 ## Tecnologias
 
 ### Backend
-- **Java 17** - Linguagem de programação
-- **Spring Boot 3.1.5** - Framework web para criar a API REST
-- **Apache Maven 3.9.11** - Gerenciador de dependências e build
-- **Apache PDFBox 2.0.27** - Extração de texto de arquivos PDF
-- **LangChain4j 0.31.0** - Framework para integração com IA
-- **AllMiniLmL6V2EmbeddingModel** - Modelo de embeddings local (CPU-based)
-- **Tomcat** - Servidor HTTP embarcado (porta 8080)
+- Java 17
+- Spring Boot 3.1.5
+- Maven
+- Apache PDFBox
+- Apache Lucene
+- LangChain4j
 
 ### Frontend
-- **HTML5** - Markup dos documentos
-- **CSS3** - Estilização com variáveis CSS customizadas
-- **JavaScript (Vanilla)** - Lógica interativa com Fetch API
+- HTML
+- CSS
+- JavaScript (Vanilla)
+
+Observação: os arquivos do frontend usados pela aplicação ficam em `backend/src/main/resources/static`.
 
 ## Estrutura do Projeto
 
-```
+```text
 findinpdf/
-├── backend/                          # Aplicação Spring Boot
-│   ├── src/main/java/.../findinpdf/
-│   │   ├── Main.java                 # Entry point da aplicação
-│   │   ├── controller/               # Endpoints REST
+├── backend/
+│   ├── src/main/java/com/br/edu/iftm/findinpdf/
+│   │   ├── Main.java
+│   │   ├── controller/
 │   │   │   └── PdfController.java
-│   │   ├── service/                  # Lógica de negócio
-│   │   │   └── PdfService.java
-│   │   └── model/                    # Modelos de dados
-│   │       └── PdfChunk.java
+│   │   ├── model/
+│   │   │   └── PdfChunk.java
+│   │   └── service/
+│   │       └── PdfService.java
+│   ├── src/main/resources/
+│   │   ├── application.properties
+│   │   └── static/
+│   │       ├── index.html
+│   │       ├── styles.css
+│   │       └── app.js
 │   └── pom.xml
-├── frontend/                         # Interface do usuário
-│   ├── index.html                    # Página principal
-│   ├── styles.css                    # Estilos
-│   ├── app.js                        # Lógica JavaScript
-│   └── pom.xml
-├── pdfs/                             # Pasta com documentos PDF
-├── pom.xml                           # POM parent (multi-módulo)
+├── frontend/
+├── pdfs/
+├── pom.xml
 └── README.md
 ```
 
 ## Endpoints da API
 
-- `GET /api/pdfs/listar` - Lista todos os PDFs disponíveis
-- `POST /api/pdfs/indexar` - Indexa os PDFs selecionados (JSON array) e limpas os resultados anteriores
-- `GET /api/pdfs/buscar?pergunta=sua_pergunta` - Realiza busca semântica
+- `GET /api/pdfs/listar`: lista os PDFs disponíveis
+- `POST /api/pdfs/indexar`: indexa os PDFs selecionados (array JSON)
+- `GET /api/pdfs/buscar?pergunta=...`: executa a busca
 
-## Como executar
+## Como Executar
 
 ### Pré-requisitos
-- Java 17 ou superior instalado
-- Maven 3.6 ou superior instalado
+
+- Java 17+
+- Maven 3.6+
 - PDFs na pasta `pdfs/` na raiz do projeto
 
-### Passos
+### Rodar backend
 
-
-### Usando a aplicação
-
-1. **Indexar documentos**:
-   - A página exibe a lista de PDFs disponíveis na pasta `pdfs/`
-   - Selecione um ou mais PDFs usando as checkboxes
-   - Clique em "Indexar selecionados" para processar os documentos
-   - O sistema extrairá o texto e gerará embeddings semânticos
-
-2. **Buscar**:
-   - Após indexar, digite sua pergunta no campo "Buscar no PDF indexado"
-   - Clique em "Buscar" ou pressione Enter
-   - O sistema retornará os trechos mais relevantes com arquivo e página
-
-## Detalhes Técnicos
-
-- **Embedding**: Usa o modelo AllMiniLmL6V2, executado localmente sem dependência externa
-- **Similaridade**: Calcula similaridade de cosseno entre vetores de embeddings
-- **Limiar**: Retorna resultados com score > 0.25, ou o melhor match se nenhum ultrapassar o limiar
-- **Índice**: Armazenado em memória (lista); limpo quando novos PDFs são indexados
-- **CORS**: Habilitado globalmente para permitir requisições do frontend
-
-## Configuração de chunking
-
-O comportamento de chunking pode ser ajustado em `backend/src/main/resources/application.properties`:
-
-- `findinpdf.chunk.mode=paragraph` — cada chunk é um parágrafo do texto extraído
-- `findinpdf.chunk.mode=words` — cada chunk tem no máximo `findinpdf.chunk.max-words` palavras
-
-Exemplo de configuração:
-
-```properties
-findinpdf.chunk.mode=paragraph
-findinpdf.chunk.max-words=500
+```bash
+cd backend
+mvn spring-boot:run
 ```
 
-No modo `paragraph`, cada parágrafo é tratado como um chunk. No modo `words`, o texto é dividido em chunks com até 500 palavras por padrão.
+### Acessar aplicação
+
+- Abra no navegador: `http://localhost:8080`
+
+### Fluxo de uso
+
+1. Selecione um ou mais PDFs
+2. Clique em `Indexar selecionados`
+3. Faça uma pergunta no campo de busca
+
+## Configurações Principais
+
+Arquivo: `backend/src/main/resources/application.properties`
+
+### Chunking
+
+- `findinpdf.chunk.mode=words` ou `paragraph`
+- `findinpdf.chunk.max-words=500`
+
+### Sinônimos (OpenThesaurus)
+
+- `findinpdf.synonyms.enabled=true`
+- `findinpdf.synonyms.openthesaurus.url=https://www.openthesaurus.pt/synonyme/search`
+- `findinpdf.synonyms.openthesaurus.fallback-url=https://www.openthesaurus.de/synonyme/search`
+- `findinpdf.synonyms.max-per-term=6`
+- `findinpdf.synonyms.request-timeout-ms=1200`
+
+## Logs de Busca
+
+O backend emite logs com prefixo `[BUSCA]`, incluindo:
+
+- termos analisados e termos originais
+- query Lucene montada
+- total de hits lexicais
+- quantidade adicionada por complemento semântico
+- total final retornado
+
+## Referências de Conteúdo
+
+- Java Básico e Orientação a Objeto: https://canal.cecierj.edu.br/012016/d7d8367338445d5a49b4d5a49f6ad2b9.pdf
+- Spring Boot Reference: https://docs.spring.io/spring-boot/docs/3.2.7/reference/pdf/spring-boot-reference.pdf
+
+## Design
+
+Figma: https://www.figma.com/design/F4v5CwrHF31Pad7A056eQK/Untitled?node-id=0-1&t=PLNjFzH43Q4SL9rH-1
 

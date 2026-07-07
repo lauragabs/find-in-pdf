@@ -1,39 +1,19 @@
-Recomendações práticas
+to do 
 
-Extrator: Apache PDFBox (extração por página).
-Chunking: usar cada página como chunk inicial; se página for longa, fazer chunking por parágrafos/janelas de N sentenças mantendo metadados de página.
-Armazenamento: in-memory List<PdfChunk>
-Buscar: se quiser simplicidade: substring case-insensitive; se quiser semântico: OpenAI embeddings (ou outro provedor) + coseno, mas retornar sempre o texto original.
+Lematização/stemming em PT-BR para o grifo
+Fazer herda, herdar, herdou, herdando virarem a mesma raiz antes de comparar.
 
-Exemplo mínimo (Java) — fluxo: extrair → indexar (lista de chunks) → endpoint de busca que retorna trechos originais
+Separar termos de intenção vs termos de conteúdo
+Em quem herda, o conteúdo é herda/herdar; quem é intenção da pergunta.
 
-Dependência: org.apache.pdfbox:pdfbox
+Re-ranker de precisão no top resultados
+Depois da busca semântica, reordenar top N com um modelo mais preciso (cross-encoder) ou regra híbrida com peso maior para termo técnico.
 
---------------
+Chunking mais semântico
+Trocar chunks longos por parágrafos menores com sobreposição leve. Isso reduz “vazamento de assunto” no trecho mostrado.
 
-Resposta ao usuário (o que será devolvido)
+Score explicável no retorno
+Retornar score semântico, termos-chave encontrados e quantos termos bateram. Ajuda muito a depurar relevância.
 
-Sempre devolva o texto original do chunk selecionado, mais metadados:
-arquivo (nome)
-número da página
-
------------------
-
-Core
-
-LangChain4j: orquestra chains, retrievals e fluxos com LLM/embeddings.
-Apache PDFBox: extrai texto dos PDFs (por página/posição).
-Chunker: divide texto em blocos (página/parágrafo/janela) e adiciona metadados (arquivo, página).
-Provedor de embeddings: gera vetores para cada chunk (ex.: OpenAI, Hugging Face).
-Vector store / índice: armazena embeddings e permite busca por similaridade (ex.: FAISS, Milvus, Pinecone, Weaviate, ou in‑memory para protótipo).
-Retriever: componente que consulta o vector store e retorna os chunks mais relevantes (sem modificar o texto original).
-
-Backend / API
-
-Spring Boot (ou outro framework Java): expõe endpoints REST para indexação, busca e gerenciamento de PDFs.
-Armazenamento de arquivos: pasta local (pdfs) ou S3 para guardar os PDFs originais.
-Banco de metadados: SQLite/Postgres para mapear chunks → arquivo → página e controlar estados de indexação.
-Frontend
-
-Interface web (React/Vue/HTML): campo de busca e exibição dos trechos retornados com arquivo e página.
-Infra e utilitários
+Conjunto de testes de consulta
+Criar um mini benchmark de perguntas reais (herança, polimorfismo, classe abstrata, exceção...) com página esperada para medir evolução.

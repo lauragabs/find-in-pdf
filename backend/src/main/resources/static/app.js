@@ -150,12 +150,22 @@ output.addEventListener('click', (event) => {
 });
 
 function extrairPalavrasChave(pergunta) {
-    const stopWords = new Set(['com', 'de', 'do', 'da', 'dos', 'das', 'em', 'no', 'na', 'nos', 'nas', 'para', 'por', 'e', 'ou', 'um', 'uma', 'uns', 'umas', 'que', 'o', 'a']);
-    return pergunta
+    const stopWords = new Set([
+        'a', 'o', 'as', 'os', 'de', 'do', 'da', 'dos', 'das', 'em', 'no', 'na', 'nos', 'nas',
+        'para', 'por', 'com', 'sem', 'como', 'que', 'e', 'ou', 'um', 'uma', 'uns', 'umas',
+        'qual', 'quais', 'quem', 'quando', 'onde', 'porque', 'por', 'que', 'oq', 'oque',
+        'porquê', 'praque', 'funciona', 'funcionar', 'sobre', 'é', 'ser', 'estar', 'foi', 'era', 'sao', 'são'
+    ]);
+
+    const tokens = pergunta
         .toLowerCase()
         .split(/[^\p{L}\p{Nd}]/u)
-        .filter(p => p.length > 1 && !stopWords.has(p))
-        .filter((p, i, arr) => arr.indexOf(p) === i);
+        .map((p) => p.trim())
+        .filter((p) => p.length > 2)
+        .map(normalizarToken)
+        .filter((p) => p && !stopWords.has(p));
+
+    return tokens.filter((p, i) => tokens.indexOf(p) === i);
 }
 
 function obterPalavrasRelevantes(chunk, pergunta) {
@@ -167,7 +177,15 @@ function obterPalavrasRelevantes(chunk, pergunta) {
         return palavrasDoBackend;
     }
 
-    return extrairPalavrasChave(pergunta);
+    // Sem fallback: evita destacar termos genéricos quando o backend não encontrou termos relevantes.
+    return [];
+}
+
+function normalizarToken(texto) {
+    return String(texto || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
 }
 
 function destacarPalavras(texto, palavras) {

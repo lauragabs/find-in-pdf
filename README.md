@@ -11,30 +11,28 @@ Facilitar a localização de informação em PDFs extensos, reduzindo leitura ma
 ## Funcionalidades
 
 - Indexação de um ou mais PDFs da pasta `pdfs/`
-- Busca híbrida (lexical e semântica)
-- Expansão por sinônimos para consultas curtas
+- Busca semântica com embeddings locais
+- Fallback controlado para melhorar cobertura em consultas curtas
 - Destaque de termos relevantes no resultado
 - Exibição de trecho, arquivo e página
 
 ## Arquitetura de Busca
 
-Atualmente a busca opera em três modos:
-
-- Consulta com menos de 2 palavras: busca lexical com expansão de sinônimos (OpenThesaurus)
-- Consulta com 2 palavras: modo híbrido (lexical + semântico)
-- Consulta com mais de 2 palavras: prioridade para busca semântica (pergunta vs chunk)
-
-### Componente lexical
-
-- Lucene (`PortugueseAnalyzer`) para normalização e busca textual
-- Índice em memória, reconstruído a cada indexação
-- Query por termo exato e por prefixo
+Atualmente a busca é semântica, baseada em embeddings de chunks indexados em memória.
 
 ### Componente semântico
 
 - Embeddings locais com `AllMiniLmL6V2EmbeddingModel`
 - Similaridade de cosseno entre pergunta e chunks
-- Fallback por melhor score quando aplicável
+- Termos-chave da pergunta passam por normalização (minúsculas, sem acento) e remoção de stopwords
+- Pontuação final por chunk: score semântico + bônus por correspondência textual de termos-chave
+
+### Regras de decisão de resultado
+
+- Retorno direto: chunks com pontuação final acima de `0.35`
+- Fallback geral: melhor chunk se score >= `0.20` e houver ao menos 1 correspondência textual
+- Fallback especial (consulta de 1 termo): permite retorno sem correspondência textual quando score >= `0.30`
+- Consultas genéricas (ex.: apenas "buscar", "pesquisar") são ignoradas
 
 ## Tecnologias
 
@@ -84,6 +82,7 @@ findinpdf/
 - `GET /api/pdfs/listar`: lista os PDFs disponíveis
 - `POST /api/pdfs/indexar`: indexa os PDFs selecionados (array JSON)
 - `GET /api/pdfs/buscar?pergunta=...`: executa a busca
+- `GET /api/health`: health-check simples da aplicação
 
 ## Como Executar
 
@@ -119,30 +118,20 @@ Arquivo: `backend/src/main/resources/application.properties`
 - `findinpdf.chunk.mode=words` ou `paragraph`
 - `findinpdf.chunk.max-words=500`
 
-### Sinônimos (OpenThesaurus)
-
-- `findinpdf.synonyms.enabled=true`
-- `findinpdf.synonyms.openthesaurus.url=https://www.openthesaurus.pt/synonyme/search`
-- `findinpdf.synonyms.openthesaurus.fallback-url=https://www.openthesaurus.de/synonyme/search`
-- `findinpdf.synonyms.max-per-term=6`
-- `findinpdf.synonyms.request-timeout-ms=1200`
-
 ## Logs de Busca
 
 O backend emite logs com prefixo `[BUSCA]`, incluindo:
 
-- termos analisados e termos originais
-- query Lucene montada
-- total de hits lexicais
-- quantidade adicionada por complemento semântico
-- total final retornado
+- consultas genéricas ignoradas
+- consulta sem termos-chave após limpeza
+- quantidade de candidatos acima do threshold
+- fallback semântico aplicado (inclusive para consulta de termo único)
+- ausência de resultados quando nenhum critério de confiança é atendido
 
 ## Referências de Conteúdo
 
 - Java Básico e Orientação a Objeto: https://canal.cecierj.edu.br/012016/d7d8367338445d5a49b4d5a49f6ad2b9.pdf
-- Spring Boot Reference: https://docs.spring.io/spring-boot/docs/3.2.7/reference/pdf/spring-boot-reference.pdf
 
 ## Design
 
 Figma: https://www.figma.com/design/F4v5CwrHF31Pad7A056eQK/Untitled?node-id=0-1&t=PLNjFzH43Q4SL9rH-1
-

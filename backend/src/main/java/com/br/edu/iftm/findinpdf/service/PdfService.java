@@ -28,15 +28,16 @@ import dev.langchain4j.store.embedding.CosineSimilarity;
 @Service
 public class PdfService {
 
-    private static final double THRESHOLD_SEMANTICO = 0.45;
-    private static final double THRESHOLD_MELHOR_RESULTADO = 0.35;
+    private static final double THRESHOLD_SEMANTICO = 0.35;
+    private static final double THRESHOLD_MELHOR_RESULTADO = 0.20;
+    private static final double THRESHOLD_FALLBACK_UNICO_TERMO = 0.30;
     private static final double BONUS_POR_TERMO_CHAVE = 0.12;
     private static final Set<String> TERMOS_GENERICOS_CONSULTA = Set.of(
             "buscar", "busca", "pesquisar", "pesquisa", "procurar", "procura", "consulta", "query");
     private static final Set<String> STOPWORDS_CONSULTA = Set.of(
             "a", "o", "as", "os", "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas",
             "para", "por", "com", "sem", "como", "que", "e", "ou", "um", "uma", "uns", "umas",
-            "qual", "quais", "quem", "quando", "onde", "porque", "por", "que", "oq", "oque",
+            "qual", "quais", "quem", "quando", "onde", "porque", "oq", "oque",
             "porquê", "praque", "funciona", "funcionar", "sobre", "ser", "estar", "foi", "era", "sao", "são");
 
     private final List<PdfChunk> bancoDeDadosLocal = new ArrayList<>();
@@ -277,15 +278,25 @@ public class PdfService {
             return resultados;
         }
 
-        // Se nenhum resultado forte for encontrado, retorna o chunk com a melhor pontuação, mesmo que seja baixa
+        // Se nenhum resultado forte for encontrado, retorna o chunk com a melhor pontuação
+        int correspondenciasMelhorChunk = correspondenciasPorChunk.getOrDefault(melhorChunk, 0);
+        boolean consultaUnicoTermo = termosChaveConsulta.size() == 1;
+        boolean fallbackSemMatchTextual = consultaUnicoTermo
+                && melhorPontuacao >= THRESHOLD_FALLBACK_UNICO_TERMO;
+
         if (melhorChunk != null
             && melhorPontuacao >= THRESHOLD_MELHOR_RESULTADO
-                && correspondenciasPorChunk.getOrDefault(melhorChunk, 0) > 0) {
+                && (correspondenciasMelhorChunk > 0 || fallbackSemMatchTextual)) {
             System.out.println("Nenhuma correspondência forte encontrada; retornando o melhor resultado disponível com score=" + melhorPontuacao);
             melhorChunk.setPalavrasRelevantes(extrairPalavrasRelevantes(melhorChunk, termosChaveConsulta));
-            if (melhorChunk.getPalavrasRelevantes() != null && !melhorChunk.getPalavrasRelevantes().isEmpty()) {
+            if (correspondenciasMelhorChunk > 0
+                    && melhorChunk.getPalavrasRelevantes() != null
+                    && !melhorChunk.getPalavrasRelevantes().isEmpty()) {
                 resultados.add(melhorChunk);
                 System.out.println("[BUSCA] fallback melhor semântico aplicado.");
+            } else if (fallbackSemMatchTextual) {
+                resultados.add(melhorChunk);
+                System.out.println("[BUSCA] fallback semântico para consulta de termo único aplicado.");
             } else {
                 System.out.println("[BUSCA] fallback descartado por ausência de termos relevantes.");
             }
@@ -297,6 +308,7 @@ public class PdfService {
         return resultados;
     }
 
+    // Verifica se a consulta do usuário é genérica, contendo apenas termos comuns de busca
     private boolean isConsultaGenerica(String perguntaUsuario) {
         List<String> termos = extrairTermosAnalisados(perguntaUsuario);
         if (termos.isEmpty()) {
@@ -306,6 +318,7 @@ public class PdfService {
         return termos.stream().allMatch(TERMOS_GENERICOS_CONSULTA::contains);
     }
 
+    // Conta quantos termos-chave da consulta estão presentes no chunk, considerando normalização e stopwords
     private int contarTermosChaveCorrespondentes(PdfChunk chunk, Set<String> termosConsultaNormalizados) {
         if (termosConsultaNormalizados.isEmpty()) {
             return 0;
@@ -330,6 +343,7 @@ public class PdfService {
         return correspondencias;
     }
 
+    // Extrai os termos-chave da consulta, removendo stopwords e termos muito curtos
     private Set<String> extrairTermosChaveConsulta(Set<String> termosConsultaNormalizados) {
         return termosConsultaNormalizados.stream()
                 .filter(t -> t.length() > 2)
@@ -337,6 +351,7 @@ public class PdfService {
                 .collect(Collectors.toSet());
     }
 
+    // Normaliza o texto removendo acentos, convertendo para minúsculas e removendo espaços extras
     private String normalizarToken(String texto) {
         if (texto == null || texto.isBlank()) {
             return "";
@@ -348,12 +363,14 @@ public class PdfService {
                 .trim();
     }
 
+    // Prepara a lista de palavras relevantes para cada chunk com base nos termos-chave da consulta
     private void prepararPalavrasRelevantes(List<PdfChunk> chunks, Set<String> termosConsulta) {
         for (PdfChunk chunk : chunks) {
             chunk.setPalavrasRelevantes(extrairPalavrasRelevantes(chunk, termosConsulta));
         }
     }
 
+    // Extrai as palavras relevantes de um chunk com base nos termos-chave da consulta
     private List<String> extrairPalavrasRelevantes(PdfChunk chunk, Set<String> termosConsulta) {
         LinkedHashSet<String> palavrasRelevantes = new LinkedHashSet<>();
         Set<String> termosConsultaNormalizados = termosConsulta.stream()
@@ -380,6 +397,7 @@ public class PdfService {
         return new ArrayList<>(palavrasRelevantes);
     }
 
+    // Extrai os termos analisados de um texto, removendo stopwords e termos muito curtos
     private List<String> extrairTermosAnalisados(String texto) {
         if (texto == null || texto.isBlank()) {
             return List.of();
@@ -392,6 +410,7 @@ public class PdfService {
                 .collect(Collectors.toList());
     }
 
+    // Extrai as palavras originais de um texto, sem normalização
     private List<String> extrairPalavrasOriginais(String texto) {
         if (texto == null || texto.isBlank()) {
             return List.of();
@@ -404,6 +423,7 @@ public class PdfService {
                 .collect(Collectors.toList());
     }
 
+    // Limpa o texto extraído do PDF, padronizando quebras de linha e removendo palavras quebradas por hífen
     private String limparTextoExtraido(String texto) {
         if (texto == null || texto.isBlank()) {
             return texto;
